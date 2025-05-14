@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Склад — Товары и Запасы</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/home">SupplyChainApp</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+                <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+                <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+                <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+                <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+            </ul>
+            <ul class="navbar-nav mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/settings">Настройки</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid mt-4">
+    <div class="row mt-4 align-items-stretch">
+        <div class="col-lg-6 mb-4 col-xxl-10">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span>История запасов</span>
+                    <div>
+                        <form th:action="@{/warehouses/history/import}" method="post" enctype="multipart/form-data" class="d-inline">
+                            <input type="hidden" name="warehouseId" th:value="${warehouse.id}" />
+
+                            <label class="btn btn-outline-light btn-sm mb-0">
+                                Импорт
+                                <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()">
+                            </label>
+                        </form>
+                        <a class="btn btn-outline-light btn-sm mb-0" th:href="@{/warehouses/history/export}">Экспорт</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <select id="productSelector" class="form-select mb-3">
+                            <option value="">Все товары</option>
+                            <th:block th:each="p : ${products}">
+                                <option th:value="${p.id.product.id}" th:text="${p.id.product.name}"></option>
+                            </th:block>
+                        </select>
+
+                    </div>
+                    <canvas id="stockHistoryChart" style="flex: 1; width: 100%; height: 400px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 col-xxl-2 mb-4">
+            <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">Текущие запасы</div>
+            <div class="card-body">
+                <canvas id="stockPieChart" style="width: 100%; height: 400px;"></canvas>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span>Список товаров на складе: <span th:text="${warehouse.name}">Склад</span> </span>
+                    <div>
+                        <form th:action="@{/warehouses/stock/import}" method="post" enctype="multipart/form-data" class="d-inline">
+                            <label class="btn btn-outline-light btn-sm mb-0">
+                                Импорт
+                                <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()">
+                            </label>
+                        </form>
+                        <a class="btn btn-outline-light btn-sm mb-0" th:href="@{/warehouses/stock/export}">Экспорт</a>
+                    </div>
+
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" placeholder="Поиск по названию или коду товара..." id="searchInput" onkeyup="filterTable()">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" id="productTable">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Код товара</th>
+                                <th>Наименование товара</th>
+                                <th onclick="sortTable(2)" style="cursor:pointer;">Количество ▲▼</th>
+                                <th onclick="sortTable(3)" style="cursor:pointer;">Занимаемый объём</th>
+                                <th>Действия</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="p : ${products}">
+                                <td th:text="${p.id.product.sku}">00000000</td>
+                                <td th:text="${p.id.product.name}">Название</td>
+                                <td th:text="${p.quantity}">0</td>
+                                <td th:text="${p.quantity * p.id.product.volume}">0</td>
+
+                                <td>
+                                    <a th:href="@{'/products/view/' + ${p.id.product.id}}" class="btn btn-outline-success btn-sm">
+                                        <img src="/img/open.png" alt="Подробнее" style="width: 16px; height: 16px;"><span>Подробнее</span>
+                                    </a>
+
+
+                                    <button type="button" class="btn btn-outline-success btn-sm"
+                                            th:attr="onclick=|openEditModal(${p.id.product.id}, ${p.quantity}, ${warehouse.id})|">
+                                        <img src="/img/edit.png" alt="Редактировать" style="width: 16px; height: 16px;"><span>Редактировать</span>
+
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="productModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form class="modal-content"
+              th:action="@{'/warehouses/products/save'}"
+              method="post"
+              id="productForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Товар</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="productId" id="productId">
+                <input type="hidden" name="warehouseId" id="warehouseId">
+
+                <div class="mb-3">
+                    <label class="form-label">Количество</label>
+                    <input type="number" class="form-control" name="quantity" id="quantity" min="0">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-success">Сохранить</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+
+<script th:inline="javascript">
+    const labels = /*[[${labels}]]*/ [];
+    const data = /*[[${values}]]*/ [];
+    const maxCapacity = [[${warehouse.capacity}]];
+
+    let chart;
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const ctxLine = document.getElementById('stockHistoryChart').getContext('2d');
+
+        chart = new Chart(ctxLine, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Количество запасов',
+                    data: data,
+                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+               // plugins: {
+               //      annotation: {
+               //           annotations: {
+               //              maxLine: {
+               //                  type: 'line',
+               //                  yMin: maxCapacity,
+               //                  yMax: maxCapacity,
+               //                  borderColor: 'rgba(220, 53, 69, 0.8)',
+               //                  borderWidth: 2,
+               //                  borderDash: [6, 6],
+               //                  label: {
+               //                      content: 'Макс. вместимость',
+               //                      enabled: true,
+               //                      position: 'end',
+               //                      backgroundColor: 'rgba(220, 53, 69, 0.8)',
+               //                      color: '#fff',
+               //                      font: { weight: 'bold' }
+               //                  }
+               //              }
+               //          }
+               //      }
+               //  }
+            }
+        });
+
+        const productSelector = document.getElementById('productSelector');
+        productSelector.addEventListener('change', function () {
+            const productId = this.value;
+            const warehouseId = [[${warehouse.id}]];
+
+            if (!productId) {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = data;
+                chart.update();
+                return;
+            }
+
+            fetch(`/warehouses/${warehouseId}/product/${productId}/history`)
+                .then(res => res.json())
+                .then(json => {
+                    const newLabels = json.map(e => e.date);
+                    const newData = json.map(e => e.quantity);
+
+                    chart.data.labels = newLabels;
+                    chart.data.datasets[0].data = newData;
+                    chart.update();
+                })
+                .catch(error => console.error('Ошибка загрузки данных:', error));
+        });
+    });
+
+
+    function filterTable() {
+        const input = document.getElementById("searchInput").value.toLowerCase();
+        const rows = document.querySelectorAll("#productTable tbody tr");
+        rows.forEach(row => {
+            const sku = row.cells[0].textContent.toLowerCase();
+            const name = row.cells[1].textContent.toLowerCase();
+            const matches = sku.includes(input) || name.includes(input);
+            row.style.display = matches ? "" : "none";
+        });
+    }
+
+
+    function openEditModal(id, quantity, warehouseId) {
+        document.getElementById("productId").value = id;
+        document.getElementById("warehouseId").value = warehouseId;
+
+        document.getElementById("quantity").value = quantity;
+        document.getElementById("modalTitle").textContent = "Редактирование количества товара";
+        const modal = new bootstrap.Modal(document.getElementById("productModal"));
+        modal.show();
+    }
+
+    let sortDirection = false;
+    function sortTable(colIndex) {
+        const table = document.getElementById("productTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a, b) => {
+            const aVal = parseFloat(a.cells[colIndex].textContent) || 0;
+            const bVal = parseFloat(b.cells[colIndex].textContent) || 0;
+            return sortDirection ? aVal - bVal : bVal - aVal;
+        });
+        sortDirection = !sortDirection;
+        rows.forEach(row => tbody.appendChild(row));
+    }
+        document.addEventListener("DOMContentLoaded", function() {
+            sortTable(2);
+        });
+
+
+
+        const products = [[${products}]];
+        const curDate = [[${curDate}]];
+
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const productMap = new Map();
+
+            products.forEach(p => {
+                const productDate = p.id.stockDate;
+                if (productDate === curDate) {
+                    const name = p.id.product.name;
+                    const quantity = p.quantity;
+
+                    if (productMap.has(name)) {
+                        productMap.set(name, productMap.get(name) + quantity);
+                    } else {
+                        productMap.set(name, quantity);
+                    }
+                }
+            });
+
+            const labels = [];
+            const values = [];
+
+            productMap.forEach((quantity, name) => {
+                if (quantity > 0) {
+                    labels.push(name);
+                    values.push(quantity);
+                }
+            });
+
+
+
+            const ctxPie = document.getElementById('stockPieChart').getContext('2d');
+            new Chart(ctxPie, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: ['#198754', '#20c997', '#6f42c1', '#0d6efd', '#fd7e14', '#dc3545']
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        });
+</script>
+
+
+</body>
+</html>

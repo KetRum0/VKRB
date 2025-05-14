@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>SupplyChainApp</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/home">SupplyChainApp</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+        <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+        <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+        <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+        <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+      </ul>
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">Настройки</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid mt-4">
+  <div class="row mb-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body" style="height: 400px;">
+          <canvas id="supplyChart" style="height: 100% !important; width: 100% !important;"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body p-0">
+          <div id="map" style="height: 400px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+          <span>Недавние поставки</span>
+          <button class="btn btn-light btn-sm mb-0" data-bs-toggle="modal" data-bs-target="#addDeliveryModal">
+            <img src="/img/add.png" alt="Загрузить" style="width: 20px; height: 20px;">
+          </button>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered table-striped">
+            <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Дата</th>
+              <th>Пункт отправления</th>
+              <th>Пункт назначения</th>
+              <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="delivery, iterStat : ${deliveries}">
+              <td th:text="${iterStat.index + 1}">1</td>
+              <td th:text="${delivery.deliveryDate}">2025-04-06</td>
+              <td th:text="${delivery.edge_id.fromNodeId.name}">Склад А</td>
+              <td th:text="${delivery.edge_id.toNodeId.name}">Склад B</td>
+              <td class="d-flex gap-2">
+                <a th:href="@{/deliveries/view/{id}(id=${delivery.id})}" class="btn btn-outline-success btn-sm d-flex align-items-center gap-2">
+                  <img src="/img/open.png" alt="Подробнее" style="width: 16px; height: 16px;"><span>Подробнее</span>
+                </a>
+                <a th:href="@{/deliveries/download/{id}(id=${delivery.id})}" class="btn btn-outline-success btn-sm">
+                  <img src="/img/download.png" alt="Скачать" style="width: 16px; height: 16px;">
+                </a>
+                <form th:action="@{/deliveries/delete/{id}(id=${delivery.id})}" method="post" onsubmit="return confirm('Удалить поставку?');">
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <img src="/img/delete.png" alt="Удалить" style="width: 20px; height: 20px;">
+                  </button>
+                </form>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+          <span>Недавние отгрузки</span>
+          <button class="btn btn-light btn-sm mb-0" data-bs-toggle="modal" data-bs-target="#addShipmentModal">
+            <img src="/img/add.png" alt="Загрузить" style="width: 20px; height: 20px;">
+          </button>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered table-striped">
+            <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Дата</th>
+              <th>Склад</th>
+              <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="shipment, iterStat : ${shipments}">
+              <td th:text="${iterStat.index + 1}">1</td>
+              <td th:text="${shipment.shipmentDate}">2025-04-06</td>
+              <td th:text="${shipment.warehouse.name}">Склад А</td>
+              <td class="d-flex gap-2">
+                <a th:href="@{/shipments/view/{id}(id=${shipment.id})}" class="btn btn-outline-success btn-sm d-flex align-items-center gap-2">
+                  <img src="/img/open.png" alt="Подробнее" style="width: 16px; height: 16px;"><span>Подробнее</span>
+                </a>
+                <a th:href="@{/shipments/download/{id}(id=${shipment.id})}" class="btn btn-outline-success btn-sm">
+                  <img src="/img/download.png" alt="Скачать" style="width: 16px; height: 16px;">
+                </a>
+                <form th:action="@{/shipments/delete/{id}(id=${shipment.id})}" method="post" onsubmit="return confirm('Удалить отгрузку?');">
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <img src="/img/delete.png" alt="Удалить" style="width: 20px; height: 20px;">
+                  </button>
+                </form>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addDeliveryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form th:action="@{/deliveries/add}" method="post" enctype="multipart/form-data" class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">Новая поставка</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Дата</label>
+          <input type="date" class="form-control" name="deliveryDate" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Ожидаемая дата</label>
+          <input type="date" class="form-control" name="expectedDate" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Пункт отправления</label>
+          <select class="form-select" name="fromNodeId" required>
+            <option th:each="node : ${nodes}" th:value="${node.id}" th:text="${node.name}"></option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Пункт назначения</label>
+          <select class="form-select" name="toNodeId" required>
+            <option th:each="node : ${nodes}" th:value="${node.id}" th:text="${node.name}"></option>
+          </select>
+        </div>
+        <div class="col-md-12 mt-3">
+          <label class="form-label">Загрузите Excel файл</label>
+          <input type="file" class="form-control" name="file" accept=".xlsx,.xls">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Создать</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="addShipmentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form th:action="@{/shipments/add}" method="post" enctype="multipart/form-data" class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">Новая отгрузка</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Дата</label>
+          <input type="date" class="form-control" name="shipmentDate" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Склад</label>
+          <select class="form-select" name="warehouseId" required>
+            <option th:each="w : ${warehouses}" th:value="${w.id}" th:text="${w.name}"></option>
+          </select>
+        </div>
+        <div class="col-md-12 mt-3">
+          <label class="form-label">Загрузите Excel файл</label>
+          <input type="file" class="form-control" name="file" accept=".xlsx,.xls">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Создать</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script th:inline="javascript">
+  const days = [], values = [];
+  const supplyData = /*[[${supplyData}]]*/ [];
+  const nodes = /*[[${nodes}]]*/ [];
+
+  supplyData.forEach(data => {
+    days.push(data[0]);
+    values.push(data[1]);
+  });
+
+  new Chart(document.getElementById('supplyChart'), {
+    type: 'line',
+    data: {
+      labels: days,
+      datasets: [{
+        label: 'Общее количество запасов',
+        data: values,
+        backgroundColor: 'rgba(25, 135, 84, 0.2)',
+        borderColor: 'rgba(25, 135, 84, 1)',
+        pointBackgroundColor: 'rgba(25, 135, 84, 1)',
+        pointBorderColor: 'rgba(25, 135, 84, 1)',
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.25
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Общее количество запасов на всех складах',
+          font: { size: 18 }
+        }
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45 } },
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  const map = L.map('map').setView([54.513678,36.261341], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  map.attributionControl.setPrefix('');
+  nodes.forEach(marker => {
+    L.marker([marker.latitude, marker.longitude])
+            .addTo(map)
+            .bindPopup(marker.name);
+  });
+</script>
+</body>
+</html>

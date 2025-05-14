@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Прогноз спроса | SupplyChainApp</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/home">SupplyChainApp</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+        <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+        <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+        <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+        <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+      </ul>
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">Настройки</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid mt-4">
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-success text-white">
+      Настройки прогноза
+    </div>
+    <div class="card-body">
+      <form id="forecastForm" class="row g-3" method="post" action="/forecast/run">
+        <div class="col-md-3">
+          <label class="form-label">Количество дней прогноза</label>
+          <input type="number" class="form-control" name="days" value="30" min="1">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Выберите товар</label>
+          <select class="form-select" name="productId">
+            <option th:each="product : ${products}"
+                    th:value="${product.id}"
+                    th:text="${product.name}">Товар</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Выберите склад</label>
+          <select class="form-select" name="warehouseId">
+            <option th:each="warehouse : ${warehouses}"
+                    th:value="${warehouse.id}"
+                    th:text="${warehouse.name}">Sklad</option>
+          </select>
+        </div>
+
+        <div class="col-md-12">
+          <label class="form-label">Методы прогноза</label>
+          <div class="row g-2">
+
+            <div class="col-md-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="movingAverage">
+                <label class="form-check-label" for="movingAverage">Скользящая средняя</label>
+              </div>
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="Период" min="1">
+            </div>
+
+            <div class="col-md-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="expSmooth1">
+                <label class="form-check-label" for="expSmooth1">Эксп. сглаж. 1-го порядка</label>
+              </div>
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="α (0-1)" step="0.01">
+            </div>
+
+            <div class="col-md-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="expSmooth2">
+                <label class="form-check-label" for="expSmooth2">Эксп. сглаж. 2-го порядка</label>
+              </div>
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="α (0-1)" step="0.01">
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="b (0-1)" step="0.01">
+            </div>
+
+            <div class="col-md-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="expSmooth3">
+                <label class="form-check-label" for="expSmooth3">Эксп. сглаж. 3-го порядка</label>
+              </div>
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="α (0-1)" step="0.01">
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="b (0-1)" step="0.01">
+              <input class="form-control form-control-sm mt-1" type="number" placeholder="y (0-1)" step="0.01">
+            </div>
+
+
+          </div>
+        </div>
+
+        <div class="col-12 mt-3">
+          <button type="submit" class="btn btn-success">Рассчитать</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+      <span>Прогноз спроса</span>
+      <a class="btn btn-outline-light btn-sm mb-0" th:href="@{/products/demand/export}">Экспорт</a>
+
+    </div>
+    <div class="card-body" style="height: 500px;">
+      <canvas id="forecastChart" style="height: 100% !important; width: 100% !important;"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('forecastForm').addEventListener('submit', function(event) {
+    const oldHiddenInputs = this.querySelectorAll('.dynamic-param');
+    oldHiddenInputs.forEach(input => input.remove());
+
+    const methods = [
+      { id: 'movingAverage', params: ['period'] },
+      { id: 'expSmooth1', params: ['alpha'] },
+      { id: 'expSmooth2', params: ['alpha', 'b'] },
+      { id: 'expSmooth3', params: ['alpha', 'b', 'y'] },
+      { id: 'arima', params: ['p', 'd', 'q'] },
+      { id: 'sarima', params: ['seasonal'] }
+    ];
+
+    methods.forEach(method => {
+      const checkbox = document.getElementById(method.id);
+      if (checkbox.checked) {
+        const hiddenMethod = document.createElement('input');
+        hiddenMethod.type = 'hidden';
+        hiddenMethod.name = method.id;
+        hiddenMethod.value = 'true';
+        hiddenMethod.classList.add('dynamic-param');
+        this.appendChild(hiddenMethod);
+        const inputs = checkbox.parentElement.parentElement.querySelectorAll('input.form-control-sm');
+        inputs.forEach((input, index) => {
+          const hiddenParam = document.createElement('input');
+          hiddenParam.type = 'hidden';
+          hiddenParam.name = method.id + '_' + method.params[index];
+          hiddenParam.value = input.value ? input.value : '';
+          hiddenParam.classList.add('dynamic-param');
+          this.appendChild(hiddenParam);
+        });
+      }
+    });
+  });
+</script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script th:inline="javascript">
+  const days = /*[[${days}]]*/ [];
+  const forecasted1 = /*[[${forecasted1}]]*/ []
+   const forecasted2 = /*[[${forecasted2}]]*/ [];
+   const forecasted3 = /*[[${forecasted3}]]*/ [];
+   const forecasted4 = /*[[${forecasted4}]]*/ [];
+   const forecasted5 = /*[[${forecasted5}]]*/ [];
+  const historical = /*[[${historical}]]*/ [];
+
+  const datasets = [{
+    label: 'Исторические данные',
+    data: historical,
+    backgroundColor: 'rgba(25, 135, 84, 0.2)',
+    borderColor: 'rgba(25, 135, 84, 1)',
+    pointBackgroundColor: 'rgba(25, 135, 84, 1)',
+    pointBorderColor: 'rgba(25, 135, 84, 1)',
+    borderWidth: 2,
+    pointRadius: 3,
+    tension: 0.3
+  }];
+
+  if (forecasted1) {
+    datasets.push({
+      label: 'Скользящая средняя',
+      data: forecasted1,
+      backgroundColor: 'rgba(255, 193, 7, 0.2)',
+      borderColor: 'rgba(255, 193, 7, 1)',
+      pointBackgroundColor: 'rgba(255, 193, 7, 1)',
+      pointBorderColor: 'rgba(255, 193, 7, 1)',
+      borderWidth: 2,
+      pointRadius: 3,
+      tension: 0.3,
+      borderDash: [5, 5]
+    });
+  }
+
+  if (forecasted2) {
+    datasets.push({
+      label: 'Простое сглаживание',
+      data: forecasted2,
+      backgroundColor: 'rgba(255,139,7,0.2)',
+      borderColor: 'rgb(255,131,7)',
+      pointBackgroundColor: 'rgb(255,123,7)',
+      pointBorderColor: 'rgb(255,131,7)',
+      borderWidth: 2,
+      pointRadius: 3,
+      tension: 0.3,
+      borderDash: [5, 5]
+    });
+  }
+
+  if (forecasted3) {
+    datasets.push({
+      label: 'Двойное сглаживание',
+      data: forecasted3,
+      backgroundColor: 'rgba(7,77,255,0.2)',
+      borderColor: 'rgb(7,65,255)',
+      pointBackgroundColor: 'rgb(7,57,255)',
+      pointBorderColor: 'rgb(7,86,255)',
+      borderWidth: 2,
+      pointRadius: 3,
+      tension: 0.3,
+      borderDash: [5, 5]
+    });
+  }
+
+  if (forecasted4) {
+    datasets.push({
+      label: 'Тройное сглаживание',
+      data: forecasted4,
+      backgroundColor: 'rgba(143,7,255,0.2)',
+      borderColor: 'rgb(90,7,255)',
+      pointBackgroundColor: 'rgb(156,7,255)',
+      pointBorderColor: 'rgb(69,7,255)',
+      borderWidth: 2,
+      pointRadius: 3,
+      tension: 0.3,
+      borderDash: [5, 5]
+    });
+  }
+
+  if (forecasted5) {
+    datasets.push({
+      label: 'ses',
+      data: forecasted5,
+      backgroundColor: 'rgba(129,213,239,0.88)',
+      borderColor: 'rgb(61,214,209)',
+      pointBackgroundColor: 'rgb(88,250,231)',
+      pointBorderColor: 'rgb(83,227,193)',
+      borderWidth: 2,
+      pointRadius: 3,
+      tension: 0.3,
+      borderDash: [5, 5]
+    });
+  }
+
+  new Chart(document.getElementById('forecastChart'), {
+    type: 'line',
+    data: {
+      labels: days,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Прогноз спроса на товар',
+          font: { size: 18 }
+        }
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45 } },
+        y: { beginAtZero: true }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

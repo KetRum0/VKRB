@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ABC-анализ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/home">SupplyChainApp</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+                <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+                <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+                <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+                <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+            </ul>
+            <ul class="navbar-nav mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/settings">Настройки</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-lg-8 d-flex align-items-stretch">
+            <div class="card shadow-sm w-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span>Параметры ABCXYZ-анализа</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between">
+                    <form action="/abcxyz/run" method="post" class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Граница группы А</label>
+                            <input type="number" class="form-control" name="aPercentage" value="80" min="0" max="100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Граница группы B</label>
+                            <input type="number" class="form-control" name="bPercentage" value="15" min="0" max="100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Граница группы C</label>
+                            <input type="number" class="form-control" name="cPercentage" value="5" min="0" max="100">
+                        </div>
+                        <div class="col-12">
+                            <div id="percentError" class="text-danger d-none">
+                                Сумма процентов должна быть равна 100.
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Граница группы X</label>
+                            <input type="number" class="form-control" name="xPercentage" value="10" min="0" max="100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Граница группы Y</label>
+                            <input type="number" class="form-control" name="yPercentage" value="25" min="0" max="100">
+                        </div>
+                        <div class="col-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-success">Рассчитать</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 d-flex align-items-stretch">
+            <div class="card shadow-sm w-100">
+                <div class="card-header bg-success text-white">
+                    Распределение по категориям
+                </div>
+                <div class="card-body d-flex justify-content-center align-items-center">
+                    <canvas id="abcChart" style="max-height: 300px; max-width: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span>Результаты ABC-анализа</span>
+
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered table-striped" id="productTable">
+                        <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>SKU</th>
+                            <th>Наименование</th>
+                            <th onclick="sortTable(3)" style="cursor:pointer;">Категория ▲▼</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="product, iterStat : ${products}">
+                            <td th:text="${iterStat.index + 1}">1</td> <!-- Номер строки -->
+                            <td th:text="${product.sku}">SKU001</td>
+                            <td th:text="${product.name}">Товар A1</td>
+                            <td th:text="${product.category}">A</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const data = /*[[${data}]]*/ [];
+
+    const ctx = document.getElementById('abcChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['AX', 'AY', 'AZ', 'BX', 'BY', 'BZ', 'CX', 'CY', 'CZ'],
+            datasets: [{
+                label: 'Категории',
+                data: data,
+                backgroundColor: ['#1a8a15', '#25d121', '#2cff27', '#fcae20', '#fcd220', '#fcfa20','#ff311f', '#f96251', '#fe9d92'] // зелёный, жёлтый, красный
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    const aInput = document.querySelector('[name="aPercentage"]');
+    const bInput = document.querySelector('[name="bPercentage"]');
+    const cInput = document.querySelector('[name="cPercentage"]');
+    const errorDiv = document.getElementById('percentError');
+    const calculateButton = document.querySelector('form button[type="submit"]');
+
+    function validatePercentages() {
+        const a = parseInt(aInput.value) || 0;
+        const b = parseInt(bInput.value) || 0;
+        const c = parseInt(cInput.value) || 0;
+        const sum = a + b + c;
+
+        if (sum !== 100) {
+            errorDiv.classList.remove('d-none');
+            calculateButton.disabled = true;
+            [aInput, bInput, cInput].forEach(input => input.classList.add('is-invalid'));
+        } else {
+            errorDiv.classList.add('d-none');
+            calculateButton.disabled = false;
+            [aInput, bInput, cInput].forEach(input => input.classList.remove('is-invalid'));
+        }
+    }
+
+    [aInput, bInput, cInput].forEach(input => {
+        input.addEventListener('input', validatePercentages);
+    });
+
+    validatePercentages();
+</script>
+<script>
+    let sortDirection = true;
+
+    function sortTable(colIndex) {
+        const table = document.getElementById("productTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+
+        rows.sort((a, b) => {
+            let aVal, bVal;
+
+            if (colIndex === 3) {
+                const order = { 'A': 1, 'B': 2, 'C': 3 };
+                aVal = a.cells[colIndex].textContent.trim();
+                bVal = b.cells[colIndex].textContent.trim();
+                aVal = order[aVal];
+                bVal = order[bVal];
+            } else {
+                aVal = parseFloat(a.cells[colIndex].textContent) || 0;
+                bVal = parseFloat(b.cells[colIndex].textContent) || 0;
+            }
+
+            return sortDirection ? aVal - bVal : bVal - aVal;
+        });
+
+        sortDirection = !sortDirection;
+
+        rows.forEach(row => tbody.appendChild(row));
+    }
+</script>
+
+</body>
+</html>

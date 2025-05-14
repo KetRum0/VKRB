@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Товары</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/home">SupplyChainApp</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+                <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+                <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+                <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+                <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+            </ul>
+            <ul class="navbar-nav mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/settings">Настройки</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Список товаров поставщика: <span th:text="${supplier.name}">Поставщик</span></h2>
+        <div>
+            <form th:action="@{/suppliers/view/{id}(id=${supplier.id})/import}" method="post" enctype="multipart/form-data" class="d-inline">
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                    Импорт
+                    <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()">
+                </label>
+            </form>
+            <a class="btn btn-outline-secondary btn-sm mb-0" th:href="@{/suppliers/view/{id}(id=${supplier.id})/export}">Экспорт</a>
+            <button class="btn btn-outline-success btn-sm" onclick="openAddModal()">Добавить</button>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Поиск по названию или коду товара..." id="searchInput" onkeyup="filterTable()">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped" id="productTable">
+            <thead class="table-light">
+            <tr>
+                <th>Код товара</th>
+                <th>Наименование товара</th>
+                <th onclick="sortTable(2)" style="cursor:pointer;">Цена товара ▲▼</th>
+                <th>Действия</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="p : ${products}">
+                <td th:text="${p.id.product.sku}">00000000</td>
+                <td th:text="${p.id.product.name}">Название</td>
+                <td th:text="${p.price}">50</td>
+                <td>
+                    <a th:href="@{'/products/view/' + ${p.id.product.id}}" class="btn btn-outline-success btn-sm">
+                        <img src="/img/open.png" alt="Подробнее" style="width: 16px; height: 16px;"><span>Подробнее</span>
+                    </a>
+
+
+                    <button type="button" class="btn btn-outline-success btn-sm"
+                            th:attr="onclick=|openEditModal('${p.id.product.id}', ${p.price})|">
+                        <img src="/img/edit.png" alt="Редактировать" style="width: 16px; height: 16px;">
+                        <span>Редактировать</span>
+                    </button>
+
+
+                    <form th:action="@{/suppliers/view/{id}/delete(id=${supplier.id})}" method="post"
+                          onsubmit="return confirm('Удалить товар?');" style="display: inline;">
+                        <input type="hidden" name="id_p" th:value="${p.id.product.id}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <img src="/img/delete.png" alt="Удалить" style="width: 20px; height: 20px;">
+                        </button>
+                    </form>
+
+
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form th:action="@{/suppliers/view/{id}/add(id=${supplier.id})}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить товар</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">SKU товара</label>
+                        <input type="text" class="form-control" name="sku" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Цена у поставщика</label>
+                        <input type="number" step="0.01" class="form-control" name="price" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Сохранить</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form th:action="@{/suppliers/view/{id}/edit(id=${supplier.id})}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать товар</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <input type="hidden" name="productId" id="editProductId">
+                        <label class="form-label">Цена у поставщика</label>
+                        <input type="number" step="0.01" class="form-control" name="price" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Сохранить</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openEditModal(productId, price) {
+        document.querySelector("#editProductId").value = productId;
+        document.querySelector("#editProductModal input[name='price']").value = price;
+        new bootstrap.Modal(document.getElementById('editProductModal')).show();
+    }
+
+</script>
+
+
+<script>
+    function openAddModal() {
+        new bootstrap.Modal(document.getElementById('addProductModal')).show();
+    }
+</script>
+
+
+<script>
+
+    function filterTable() {
+        const input = document.getElementById("searchInput").value.toLowerCase();
+        const rows = document.querySelectorAll("#productTable tbody tr");
+        rows.forEach(row => {
+            const sku = row.cells[0].textContent.toLowerCase();
+            const name = row.cells[1].textContent.toLowerCase();
+            const matches = sku.includes(input) || name.includes(input);
+            row.style.display = matches ? "" : "none";
+        });
+    }
+
+    let sortDirection = true;
+    function sortTable(colIndex) {
+        const table = document.getElementById("productTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a, b) => {
+            const aVal = parseFloat(a.cells[colIndex].textContent) || 0;
+            const bVal = parseFloat(b.cells[colIndex].textContent) || 0;
+            return sortDirection ? aVal - bVal : bVal - aVal;
+        });
+        sortDirection = !sortDirection;
+        rows.forEach(row => tbody.appendChild(row));
+    }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

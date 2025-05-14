@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>ABC-анализ</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/home">SupplyChainApp</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+        <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+        <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+        <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+        <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+      </ul>
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">Настройки</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid mt-4">
+  <div class="row mb-4">
+      <div class="card shadow-sm w-100">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+          <span>Параметры рассчета</span>
+        </div>
+        <div class="card-body d-flex flex-column justify-content-between">
+          <form action="/calculate/result" method="post" class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Уровень сервиса</label>
+              <input type="number" class="form-control" name="s" value="95" min="0" max="100">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">R</label>
+              <input type="number" class="form-control" name="R" value="7" min="0" max="100">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button type="submit" class="btn btn-success">Рассчитать</button>
+            </div>
+          </form>
+        </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm flex-fill">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+      <span> Формирование заказа </span>
+      <div>
+        <button id="exportButton" class="btn btn-outline-light btn-sm mb-0">Экспорт</button>
+      </div>
+    </div>
+    <div class="card-body p-2 overflow-auto">
+      <select id="warehouseSelector" class="form-select mb-3" onchange="updateProductTable()">
+        <option th:value="${warehouses.get(0).id}" th:text="${warehouses.get(0).name}">Все склады</option>
+        <option th:each="wh : ${warehouses}" th:value="${wh.id}" th:text="${wh.name}"></option>
+      </select>
+
+      <table class="table table-bordered table-striped table-sm text-center align-middle" id="productTable">
+        <thead class="table-success">
+        <tr>
+          <th>#</th>
+          <th>Код товара</th>
+          <th>Название товара</th>
+          <th>Категория</th>
+          <th>Прогнозируемый спрос</th>
+          <th>Страховой запас</th>
+          <th>Оптимальный уровень запасов</th>
+          <th>Оптимальный размер заказа</th>
+          <th>Итоговый размер заказа</th>
+        </tr>
+        </thead>
+        <tbody id="productTableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script th:inline="javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    const productsByWarehouse = /*[[${productsByWarehouse}]]*/ {};
+
+    function createTableRow(index, product) {
+      return `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${product.code}</td>
+      <td>${product.name}</td>
+      <td>${product.category}</td>
+      <td>${product.forecast}</td>
+      <td>${product.safetyStock}</td>
+      <td>${product.optimalStock}</td>
+      <td>${product.optimalOrder}</td>
+      <td
+        contenteditable="true"
+        data-id="${product.id}"
+        class="form-control p-1 bg-light border border-success text-center"
+        title="Нажмите, чтобы изменить"
+        style="min-width: 80px;"
+      >
+        ${product.optimalOrder}
+      </td>
+    </tr>
+  `;
+    }
+
+    window.updateProductTable = function () {
+      const selectedId = document.getElementById("warehouseSelector").value;
+      const products = productsByWarehouse[selectedId] || [];
+
+      const tbody = document.getElementById("productTableBody");
+      tbody.innerHTML = products.map((product, i) => createTableRow(i, product)).join("");
+    }
+
+    updateProductTable();
+
+    document.getElementById('exportButton').addEventListener('click', function () {
+      const rows = document.querySelectorAll('#productTableBody tr');
+      const orderData = [];
+
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const productId = cells[8].getAttribute('data-id');
+        const finalOrderSize = cells[8].innerText;
+
+        orderData.push({
+          productId: productId,
+          finalOrderSize: finalOrderSize
+        });
+      });
+
+      const warehouseId = document.getElementById("warehouseSelector").value;
+
+      const payload = {
+        warehouseId: warehouseId,
+        orders: orderData
+      };
+
+      fetch('/result/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error('Ошибка сети');
+                }
+                return response.blob();
+              })
+              .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'orders_export.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                alert('Экспорт завершен успешно!');
+              })
+              .catch(error => {
+                console.error('Ошибка экспорта:', error);
+                alert('Произошла ошибка при экспорте.');
+              });
+
+    });
+
+  });
+</script>
+
+
+</body>
+</html>

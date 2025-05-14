@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Товары</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/home">SupplyChainApp</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+                <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+                <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+                <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+                <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+            </ul>
+            <ul class="navbar-nav mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/settings">Настройки</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Список товаров</h2>
+        <div>
+            <form th:action="@{/products/import}" method="post" enctype="multipart/form-data" class="d-inline">
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                    Импорт
+                    <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()">
+                </label>
+            </form>
+            <a class="btn btn-outline-secondary btn-sm mb-0" th:href="@{/products/export}">Экспорт</a>
+            <button class="btn btn-outline-success btn-sm" onclick="openAddModal()">Добавить</button>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <input type="text" class="form-control" placeholder="Поиск по названию или коду товара..." id="searchInput" onkeyup="filterTable()">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped" id="productTable">
+            <thead class="table-light">
+            <tr>
+                <th>Код товара</th>
+                <th>Наименование товара</th>
+                <th onclick="sortTable(2)" style="cursor:pointer;">Объём упаковки (м^3) ▲▼</th>
+                <th onclick="sortTable(3)" style="cursor:pointer;">Вес товара (кг) ▲▼</th>
+                <th onclick="sortTable(4)" style="cursor:pointer;">Цена продажи ▲▼</th>
+                <th>Действия</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="product : ${products}">
+                <td th:text="${product.sku}">00000000</td>
+                <td th:text="${product.name}">Название</td>
+                <td th:text="${product.volume}">50</td>
+                <td th:text="${product.weight}">5</td>
+                <td th:text="${product.price}">5</td>
+
+                <td>
+                    <a th:href="@{'/products/view/' + ${product.id}}" class="btn btn-outline-success btn-sm">
+                    <img src="/img/open.png" alt="Подробнее" style="width: 16px; height: 16px;"><span>Подробнее</span>
+                    </a>
+
+
+                    <button type="button" class="btn btn-outline-success btn-sm"
+                            th:attr="onclick=|openEditModal(${product.id}, '${product.sku}', '${product.name}', ${product.volume}, ${product.weight},  ${product.price})|">
+                        <img src="/img/edit.png" alt="Редактировать" style="width: 16px; height: 16px;"><span>Редактировать</span>
+
+                    </button>
+
+                    <form th:action="@{/products/delete/{id}(id=${product.id})}" method="post"
+                          onsubmit="return confirm('Удалить товар?');"
+                          style="display: inline;">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <img src="/img/delete.png" alt="Удалить" style="width: 20px; height: 20px;">
+                        </button>
+                    </form>
+
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="productModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form class="modal-content" th:action="@{/products/save}" method="post" id="productForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Товар</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="id" id="productId">
+
+                <div class="mb-3">
+                    <label class="form-label">Код товара</label>
+                    <input type="text" class="form-control" name="sku" id="productSku" required>
+                </div>
+
+
+                <div class="mb-3">
+                    <label class="form-label">Название</label>
+                    <input type="text" class="form-control" name="name" id="productName" required>
+                </div>
+
+
+
+                <div class="mb-3">
+                    <label class="form-label">Объём упаковки (м^3)</label>
+                    <input type="number"
+                           class="form-control"
+                           name="volume"
+                           id="packageVolume"
+                           min="0"
+                           step="0.01"
+                           pattern="^\d+(\.\d{1,2})?$"
+                           inputmode="decimal"
+                           required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Вес (кг)</label>
+                    <input type="number"
+                           class="form-control"
+                           name="weight"
+                           id="productWeight"
+                           min="0"
+                           step="0.01"
+                           pattern="^\d+(\.\d{1,2})?$"
+                           inputmode="decimal"
+                           required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Цена продажи</label>
+                    <input type="number"
+                           class="form-control"
+                           name="price"
+                           id="productPrice"
+                           min="0"
+                           step="0.01"
+                           pattern="^\d+(\.\d{1,2})?$"
+                           inputmode="decimal"
+                           required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-success">Сохранить</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function filterTable() {
+        const input = document.getElementById("searchInput").value.toLowerCase();
+        const rows = document.querySelectorAll("#productTable tbody tr");
+        rows.forEach(row => {
+            const sku = row.cells[0].textContent.toLowerCase();
+            const name = row.cells[1].textContent.toLowerCase();
+            const matches = sku.includes(input) || name.includes(input);
+            row.style.display = matches ? "" : "none";
+        });
+    }
+
+    function openAddModal() {
+        document.getElementById("productForm").reset();
+        document.getElementById("modalTitle").textContent = "Добавление товара";
+
+        const modal = new bootstrap.Modal(document.getElementById("productModal"));
+        modal.show();
+    }
+
+
+    function openEditModal(id, sku, name, volume, weight, price) {
+        document.getElementById("productId").value = id;
+        document.getElementById("productSku").value = sku;
+        document.getElementById("productName").value = name;
+        document.getElementById("packageVolume").value = volume;
+        document.getElementById("productWeight").value = weight;
+        document.getElementById("productPrice").value = price;
+
+
+        document.getElementById("modalTitle").textContent = "Редактирование товара";
+
+        const modal = new bootstrap.Modal(document.getElementById("productModal"));
+        modal.show();
+    }
+
+
+    let sortDirection = true;
+    function sortTable(colIndex) {
+        const table = document.getElementById("productTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a, b) => {
+            const aVal = parseFloat(a.cells[colIndex].textContent) || 0;
+            const bVal = parseFloat(b.cells[colIndex].textContent) || 0;
+            return sortDirection ? aVal - bVal : bVal - aVal;
+        });
+        sortDirection = !sortDirection;
+        rows.forEach(row => tbody.appendChild(row));
+    }
+</script>
+
+</body>
+</html>

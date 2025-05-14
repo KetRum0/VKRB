@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Товар — {{product.name}}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/home">SupplyChainApp</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="/products">Товары</a></li>
+        <li class="nav-item"><a class="nav-link" href="/supplychain">Цепь поставок</a></li>
+        <li class="nav-item"><a class="nav-link" href="/forecast">Прогноз</a></li>
+        <li class="nav-item"><a class="nav-link" href="/planner">Заказ</a></li>
+        <li class="nav-item"><a class="nav-link" href="/abcxyz">ABCXYZ-анализ</a></li>
+      </ul>
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">Настройки</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid mt-4" style="height: 90vh; display: flex; flex-direction: column;">
+
+  <div class="row mt-8" style="flex: 50%;" >
+
+    <div class="card shadow-sm ">
+      <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <span>История спроса</span>
+        <div>
+          <form th:action="@{/products/demand/import}" method="post" enctype="multipart/form-data" class="d-inline">
+            <input type="hidden" name="warehouseId" id="importWarehouseId" />
+
+            <input type="hidden" name="productId" th:value="${productId}" />
+
+            <label class="btn btn-outline-light btn-sm mb-0">
+              Импорт
+              <input type="file" name="file" accept=".xlsx,.xls" hidden onchange="this.form.submit()">
+            </label>
+          </form>
+          <a class="btn btn-outline-light btn-sm mb-0" th:href="@{/products/demand/export}">Экспорт</a>
+        </div>
+      </div>
+      <div class="card-body p-2">
+        <select id="warehouseSelector" class="form-select mb-3" onchange="updateDemandChart()">
+        <option value="0">Все склады</option>
+        <option th:each="wh : ${warehouses}" th:value="${wh.id}" th:text="${wh.name}"></option>
+      </select>
+        <canvas id="demandLineChart" style="height: 100%; width: 100%;"></canvas>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="row mt-4 " style="flex: 40%; display: flex;" >
+    <div class="col-md-8 h-100">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+          Запасы на складах</div>
+        <div class="card-body p-2 d-flex justify-content-center align-items-center">
+          <canvas id="stockBarChart" style="height: 100%; width: 100%;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 h-90">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+          Суммарный спрос по складам</div>
+        <div class="card-body p-2 d-flex justify-content-center align-items-center">
+          <canvas id="stockDemandPieChart" style="max-height: 300px; width: 100%; height: auto;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    const stockLabels = /*[[${stockLabels}]]*/ [];
+    const stockValues = /*[[${stockValues}]]*/ [];
+
+    const demandLabels = /*[[${demandLabels}]]*/ [];
+    const demandData = /*[[${demandValues}]]*/ [];
+
+    const demandByWarehouse = /*[[${demandDataByWarehouse}]]*/ {};
+    const datesByWarehouse = /*[[${dateLabelsByWarehouse}]]*/ {};
+    // Гистограмма количества товара на складах
+    const ctxBar = document.getElementById('stockBarChart').getContext('2d');
+    new Chart(ctxBar, {
+      type: 'bar',
+      data: {
+        labels: stockLabels,
+        datasets: [{
+          label: 'Количество товара',
+          data: stockValues,
+          backgroundColor: '#198754',
+          borderColor: '#155d27',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    const ctxLine = document.getElementById('demandLineChart').getContext('2d');
+    let demandChart = new Chart(ctxLine, {
+      type: 'line',
+      data: {
+        labels: datesByWarehouse[0],
+        datasets: [{
+          label: 'Спрос на товар',
+          data: demandByWarehouse[0],
+          backgroundColor: 'rgba(40, 167, 69, 0.2)',
+          borderColor: 'rgba(40, 167, 69, 1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    window.updateDemandChart = function () {
+      const selectedId = document.getElementById("warehouseSelector").value;
+      const newData = demandByWarehouse[selectedId] || [];
+      const newLabels = datesByWarehouse[selectedId] || [];
+
+      demandChart.data.labels = newLabels;
+      demandChart.data.datasets[0].data = newData;
+      demandChart.update();
+    }
+    const ctxDemandPie = document.getElementById('stockDemandPieChart').getContext('2d');
+    new Chart(ctxDemandPie, {
+      type: 'pie',
+      data: {
+        labels: demandLabels,
+        datasets: [{
+          label: 'Суммарный спрос',
+          data: demandData,
+          backgroundColor: ['#198754', '#0dcaf0', '#ffc107'],
+          borderColor: '#fff',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const label = context.label || '';
+                const value = context.parsed;
+                return `${label}: ${value}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const warehouseSelector = document.getElementById("warehouseSelector");
+    const importWarehouseInput = document.getElementById("importWarehouseId");
+
+    importWarehouseInput.value = warehouseSelector.value;
+
+    warehouseSelector.addEventListener("change", function () {
+      importWarehouseInput.value = this.value;
+    });
+  });
+</script>
+
+</body>
+</html>
