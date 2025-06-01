@@ -2,8 +2,6 @@ package com.maidiploma.supplychainapp.controllers;
 
 import com.maidiploma.supplychainapp.model.ProductWithCategory;
 import com.maidiploma.supplychainapp.service.CalculateService;
-import com.maidiploma.supplychainapp.service.ProductService;
-import com.maidiploma.supplychainapp.service.ShipmentsProductsService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,18 +16,17 @@ public class AbcController {
 
     private final CalculateService calculateService;
 
-    public AbcController(ProductService productService, ShipmentsProductsService shipmentsProductsService, CalculateService calculateService) {
+    public AbcController(CalculateService calculateService) {
         this.calculateService = calculateService;
     }
 
     @GetMapping
-    public String showPage(Model model) {
-
+    public String getABCPage() {
         return "abc";
     }
 
     @PostMapping("/run")
-    public String calculateABCAnalysis(
+    public String calculateABC(
             @RequestParam("aPercentage") int a,
             @RequestParam("bPercentage") int b,
             @RequestParam("cPercentage") int c,
@@ -37,11 +34,12 @@ public class AbcController {
             @RequestParam("yPercentage") int y,
             Model model) {
 
-        List<ProductWithCategory> pr = calculateService.ABCXYZ(a*0.01,b*0.01,c*0.01, x*0.01, y*0.01, 0);
-        int[] data = calculateService.getStats(pr);
+        List<ProductWithCategory> products = calculateService.ABCXYZ(a*0.01,b*0.01,c*0.01, x*0.01, y*0.01, 0);
+        int[] stats = calculateService.getStats(products);
 
-        model.addAttribute("products", pr);
-        model.addAttribute("data", data);
+        model.addAttribute("products", products);
+        model.addAttribute("data", stats);
+
         return "abc";
     }
 

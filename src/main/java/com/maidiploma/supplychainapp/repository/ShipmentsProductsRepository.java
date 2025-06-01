@@ -26,11 +26,6 @@ public interface ShipmentsProductsRepository extends JpaRepository<ShipmentsProd
     @Query("DELETE FROM ShipmentsProducts dp WHERE dp.id.shipment = :shipment")
     void deleteAllByShipment(@Param("shipment") Shipment shipment);
 
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM ShipmentsProducts dp WHERE dp.id.product = :product")
-    void deleteAllByProduct(@Param("product") Product product);
-
     List<ShipmentsProducts> findById_Shipment_Id(Long id);
 
     @Query("""
@@ -42,41 +37,6 @@ public interface ShipmentsProductsRepository extends JpaRepository<ShipmentsProd
     GROUP BY w.name
 """)
     List<Object[]> findTotalProductShippedByWarehouseName(@Param("productId") Long productId);
-
-    @Query("""
-    SELECT s.shipmentDate, SUM(sp.quantity)
-    FROM ShipmentsProducts sp
-    JOIN sp.id.shipment s
-    WHERE sp.id.product.id = :productId AND s.warehouse.id = :warehouseId
-    GROUP BY s.shipmentDate
-    ORDER BY s.shipmentDate
-""")
-    List<Object[]> findDailyShipmentByProductAndWarehouse(@Param("productId") Long productId,
-                                                          @Param("warehouseId") Long warehouseId);
-
-
-
-
-    @Query("""
-    SELECT s.shipmentDate, SUM(sp.quantity)
-    FROM ShipmentsProducts sp
-    JOIN sp.id.shipment s
-    WHERE sp.id.product.id = :productId
-    GROUP BY s.shipmentDate
-    ORDER BY s.shipmentDate
-""")
-    List<Object[]> findDailyStatsByProduct(@Param("productId") Long productId);
-
-
-    @Query("SELECT s.shipmentDate, SUM(sp.quantity) " +
-            "FROM ShipmentsProducts sp " +
-            "JOIN sp.id.shipment s " +
-            "WHERE sp.id.product.id = :productId AND s.warehouse.id = :warehouseId " +
-            "GROUP BY s.shipmentDate " +
-            "ORDER BY s.shipmentDate")
-    List<Object[]> findDailyStatsByProductAndWarehouse(@Param("productId") Long productId,
-                                                       @Param("warehouseId") Long warehouseId);
-
 
     @Query("SELECT s.shipmentDate, SUM(sp.quantity) " +
             "FROM ShipmentsProducts sp " +

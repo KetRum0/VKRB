@@ -39,22 +39,5 @@ public class SupplyChainNode {
         return "Неизвестно";
     }
 
-    public BigDecimal getLatitude() {
-        if (warehouse != null) {
-            return warehouse.getLatitude();
-        } else if (supplier != null) {
-            return supplier.getLatitude();
-        }
-        return null;
-    }
-    public BigDecimal getLongitude() {
-        if (warehouse != null) {
-            return warehouse.getLongitude();
-        } else if (supplier != null) {
-            return supplier.getLongitude();
-        }
-        return null;
-    }
-
 }
 

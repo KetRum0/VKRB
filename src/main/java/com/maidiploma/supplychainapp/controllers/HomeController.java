@@ -15,21 +15,19 @@ public class HomeController {
     private final ShipmentService shipmentService;
     private final SupplyChainNodeService supplyChainNodeService;
     private final WarehousesProductsService warehousesProductsService;
-    private final CalculateService calculateService;
 
     public HomeController(
             WarehouseService warehouseService,
             DeliveryService deliveryService,
             ShipmentService shipmentService,
             SupplyChainNodeService supplyChainNodeService,
-            WarehousesProductsService warehousesProductsService,
-            CalculateService calculateService) {
+            WarehousesProductsService warehousesProductsService
+            ) {
         this.warehouseService = warehouseService;
         this.deliveryService = deliveryService;
         this.shipmentService = shipmentService;
         this.supplyChainNodeService = supplyChainNodeService;
         this.warehousesProductsService = warehousesProductsService;
-        this.calculateService = calculateService;
     }
 
     @GetMapping("/home")
@@ -50,13 +48,6 @@ public class HomeController {
         return "home";
     }
 
-    @GetMapping("/test")
-    public String getHomePage() {
-
-        calculateService.getOptimalOrder(1L);
-
-        return "test";
-    }
 }
 
 

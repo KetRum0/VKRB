@@ -32,8 +32,8 @@ public class WarehouseService {
         warehouseRepository.save(warehouse);
     }
 
-    public void add(String Wname, Integer Wcapacity, BigDecimal Wlattitude, BigDecimal Wlongitude) {
-        Warehouse warehouse = new Warehouse(null, Wname, Wcapacity, Wlattitude, Wlongitude);
+    public void add(String Wname, Integer Wcapacity, BigDecimal Wlattitude, BigDecimal Wlongitude, BigDecimal wholdingcost) {
+        Warehouse warehouse = new Warehouse(null, Wname, Wcapacity, Wlattitude, Wlongitude, wholdingcost);
         warehouseRepository.save(warehouse);
         SupplyChainNode supplyChainNode = new SupplyChainNode();
         supplyChainNode.setNodeType("warehouse");
@@ -43,8 +43,8 @@ public class WarehouseService {
 
     }
 
-    public void edit(Long id, String name, Integer capacity, BigDecimal Wlattitude, BigDecimal Wlongitude) {
-        Warehouse warehouse = new Warehouse(id, name, capacity, Wlattitude, Wlongitude);
+    public void edit(Long id, String name, Integer capacity, BigDecimal Wlattitude, BigDecimal Wlongitude, BigDecimal wholdingcost) {
+        Warehouse warehouse = new Warehouse(id, name, capacity, Wlattitude, Wlongitude, wholdingcost);
         warehouseRepository.save(warehouse);
 
     }

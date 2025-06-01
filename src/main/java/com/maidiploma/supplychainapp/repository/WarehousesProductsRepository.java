@@ -30,7 +30,6 @@ public interface WarehousesProductsRepository extends JpaRepository<WarehousesPr
     List<Object[]> getTotalOccupiedPerDayByWarehouse(@Param("warehouseId") Long warehouseId);
 
 
-
     @Modifying
     @Transactional
     @Query("DELETE FROM WarehousesProducts dp WHERE dp.id.product = :product")

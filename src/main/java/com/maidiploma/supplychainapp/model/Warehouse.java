@@ -29,4 +29,7 @@ public class Warehouse {
     @Column(precision = 9, scale = 6, nullable = false)
     private BigDecimal longitude;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal holdingCost;
+
 }

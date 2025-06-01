@@ -4,9 +4,7 @@ import com.maidiploma.supplychainapp.model.SupplyChainNode;
 import com.maidiploma.supplychainapp.model.Warehouse;
 import com.maidiploma.supplychainapp.model.WarehousesProducts;
 import com.maidiploma.supplychainapp.model.compositeKeys.WarehouseProductId;
-import com.maidiploma.supplychainapp.repository.SupplyChainNodeRepository;
-import com.maidiploma.supplychainapp.repository.WarehouseRepository;
-import com.maidiploma.supplychainapp.repository.WarehousesProductsRepository;
+import com.maidiploma.supplychainapp.repository.*;
 import com.maidiploma.supplychainapp.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,26 +27,26 @@ import java.util.stream.Collectors;
 @RequestMapping("/warehouses")
 public class WarehousesController {
 
-    @Autowired
     private final WarehouseService warehouseService;
-    @Autowired
-    private WarehousesProductsService warehousesProductsService;
-    @Autowired
-    private SettingsService settingsService;
-    @Autowired
-    private ProductService productService;
+    private final WarehousesProductsService warehousesProductsService;
+    private final SettingsService settingsService;
+    private final ProductService productService;
 
-    public WarehousesController(WarehouseService warehouseService) {
+    public WarehousesController(WarehouseService warehouseService, WarehousesProductsService warehousesProductsService, SettingsService settingsService, ProductService productService) {
         this.warehouseService = warehouseService;
+        this.warehousesProductsService = warehousesProductsService;
+        this.settingsService = settingsService;
+        this.productService = productService;
     }
 
     @PostMapping("/add")
     public String addWarehouse(@RequestParam String Wname,
                                @RequestParam Integer Wcapacity,
                                @RequestParam BigDecimal Wlongitude,
-                               @RequestParam BigDecimal Wlattitude) {
+                               @RequestParam BigDecimal Wlattitude,
+                               @RequestParam BigDecimal Wholdingcost) {
 
-        warehouseService.add(Wname, Wcapacity, Wlattitude, Wlongitude);
+        warehouseService.add(Wname, Wcapacity, Wlattitude, Wlongitude, Wholdingcost);
 
         return "redirect:/supplychain";
     }
@@ -58,9 +56,10 @@ public class WarehousesController {
                                 @RequestParam String Wname,
                                 @RequestParam Integer Wcapacity,
                                 @RequestParam BigDecimal Wlongitude,
-                                @RequestParam BigDecimal Wlattitude) {
+                                @RequestParam BigDecimal Wlattitude,
+                                @RequestParam BigDecimal Wholdingcost) {
 
-        warehouseService.edit(id, Wname, Wcapacity, Wlattitude, Wlongitude);
+        warehouseService.edit(id, Wname, Wcapacity, Wlattitude, Wlongitude, Wholdingcost);
         return "redirect:/supplychain";
     }
 
@@ -119,6 +118,8 @@ public class WarehousesController {
         model.addAttribute("values", values);
         return "warehouse";
     }
+
+
     @GetMapping("/{warehouseId}/product/{productId}/history")
     @ResponseBody
     public List<Map<String, Object>> getProductStockHistory(

@@ -33,18 +33,16 @@ public class ProductService {
     private final WarehouseRepository warehouseRepository;
     private final SupplierRepository supplierRepository;
     private final SuppliersProductsRepository suppliersProductsRepository;
-    private final ShipmentService shipmentService;
     private final ShipmentRepository shipmentRepository;
     private final ShipmentsProductsRepository shipmentsProductsRepository;
 
-    public ProductService(ProductRepository productRepository, WarehousesProductsService warehousesProductsService, SettingsService settingsService, WarehouseRepository warehouseRepository, SupplierRepository supplierRepository, SuppliersProductsRepository suppliersProductsRepository, ShipmentService shipmentService, ShipmentRepository shipmentRepository, ShipmentsProductsRepository shipmentsProductsRepository) {
+    public ProductService(ProductRepository productRepository, WarehousesProductsService warehousesProductsService, SettingsService settingsService, WarehouseRepository warehouseRepository, SupplierRepository supplierRepository, SuppliersProductsRepository suppliersProductsRepository, ShipmentRepository shipmentRepository, ShipmentsProductsRepository shipmentsProductsRepository) {
         this.productRepository = productRepository;
         this.warehousesProductsService = warehousesProductsService;
         this.settingsService = settingsService;
         this.warehouseRepository = warehouseRepository;
         this.supplierRepository = supplierRepository;
         this.suppliersProductsRepository = suppliersProductsRepository;
-        this.shipmentService = shipmentService;
         this.shipmentRepository = shipmentRepository;
         this.shipmentsProductsRepository = shipmentsProductsRepository;
     }

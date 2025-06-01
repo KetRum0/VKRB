@@ -120,7 +120,8 @@
                         <tr>
                             <th>#</th>
                             <th>Название</th>
-                            <th>Объём (м^3)</th>
+                            <th>Объём (м³)</th>
+                            <th>Стоимость хранения (за 1 м³ в дн)</th>
                             <th>Действия</th>
                         </tr>
                         </thead>
@@ -129,6 +130,7 @@
                             <td th:text="${iterStat.index + 1}">1</td>
                             <td th:text="${warehouse.name}">Склад A</td>
                             <td th:text="${warehouse.capacity}">45</td>
+                            <td th:text="${warehouse.holdingCost}">45</td>
                             <td>
                                 <a th:href="@{'/warehouses/view/' + ${warehouse.id}}" class="btn btn-outline-success btn-sm">
                                     <img src="/img/open.png" alt="Подробнее" style="width: 16px; height: 16px;"><span>Подробнее</span>
@@ -136,7 +138,7 @@
 
 
                                 <button type="button" class="btn btn-outline-success btn-sm"
-                                        th:attr="onclick=|openEditModalW(${warehouse.id}, '${warehouse.name}', ${warehouse.capacity}, ${warehouse.longitude}, ${warehouse.latitude})|">
+                                        th:attr="onclick=|openEditModalW(${warehouse.id}, '${warehouse.name}', ${warehouse.capacity}, ${warehouse.longitude}, ${warehouse.latitude}, ${warehouse.holdingCost})|">
                                     <img src="/img/edit.png" alt="Редактировать" style="width: 16px; height: 16px;"><span>Редактировать</span>
 
                                 </button>
@@ -286,6 +288,16 @@
                            id="Wcapacityin"
                            required>
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Стоимость хранения (за 1 м³ в дн) </label>
+                    <input type="number"
+                           class="form-control"
+                           name="Wholdingcost"
+                           id="Wholdingcostin"
+                           step="0.01"
+                           inputmode="decimal" required>
+                </div>
                 <div class="mb-3">
                     <label class="form-label">Широта</label>
                     <input type="number" class="form-control" name="Wlattitude" min="-999.999999"
@@ -347,7 +359,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" name="id" id="warehouseId"> <!-- Скрытое поле для ID склада -->
+                <input type="hidden" name="id" id="warehouseId">
                 <div class="mb-3">
                     <label class="form-label">Название</label>
                     <input type="text" class="form-control" name="Wname" id="Wname" required>
@@ -357,6 +369,16 @@
                     <label class="form-label">Объём (м^3)</label>
                     <input type="number" class="form-control" name="Wcapacity" id="Wcapacity"   required>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Стоимость хранения (за 1 м³ в дн) </label>
+                    <input type="number"
+                           class="form-control"
+                           name="Wholdingcost"
+                           id="Wholdingcost"
+                           step="0.01"
+                           inputmode="decimal" required>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Широта</label>
                     <input type="number" class="form-control" name="Wlattitude" step="0.000001" pattern="^\d+(\.\d{1,6})?$"
@@ -396,10 +418,11 @@
         modal.show();
     }
 
-    function openEditModalW(id, name, capacity, longitude, latitude) {
+    function openEditModalW(id, name, capacity, longitude, latitude, holdingcost) {
         document.getElementById("warehouseId").value = id;
         document.getElementById("Wname").value = name;
         document.getElementById("Wcapacity").value = capacity;
+        document.getElementById("Wholdingcost").value = holdingcost;
         document.querySelector("#editWarehouseModal input[name='Wlongitude']").value = longitude;
         document.querySelector("#editWarehouseModal input[name='Wlattitude']").value = latitude;
 
@@ -433,14 +456,12 @@
     };
     const network = new vis.Network(container, data, options);
 
-    // Открыть модаль для добавления связи
     function openAddEdgeModal() {
         document.querySelector('#addEdgeModal form').reset();
         const modal = new bootstrap.Modal(document.getElementById('addEdgeModal'));
         modal.show();
     }
 
-    // При выборе ребра — открыть редактор
     network.on('selectEdge', function (params) {
         if (params.edges.length > 0) {
             const edgeId = params.edges[0];

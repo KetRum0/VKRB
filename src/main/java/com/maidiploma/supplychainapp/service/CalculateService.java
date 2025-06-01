@@ -3,8 +3,20 @@ package com.maidiploma.supplychainapp.service;
 import com.maidiploma.supplychainapp.model.*;
 import com.maidiploma.supplychainapp.repository.SupplierRepository;
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.aspectj.runtime.internal.Conversions.longValue;
@@ -22,7 +34,7 @@ public class CalculateService {
     private final SupplierRepository supplierRepository;
     private final SuppliersProductsService suppliersProductsService;
 
-    public CalculateService(SupplyChainEdgeService supplyChainEdgeService, ProductService productService, SupplierService supplierService, SuppliersProductsService suppliersProductsService, SupplyChainNodeService supplyChainNodeService, WarehouseService warehouseService, ShipmentsProductsService shipmentsProductsService, SettingsService settingsService, ForecastService forecastService, WarehousesProductsService warehousesProductsService, DeliveryService deliveryService, SupplierRepository supplierRepository) {
+    public CalculateService(SupplyChainEdgeService supplyChainEdgeService, ProductService productService, SuppliersProductsService suppliersProductsService, WarehouseService warehouseService, ShipmentsProductsService shipmentsProductsService, SettingsService settingsService, ForecastService forecastService, WarehousesProductsService warehousesProductsService, DeliveryService deliveryService, SupplierRepository supplierRepository) {
         this.supplyChainEdgeService = supplyChainEdgeService;
         this.productService = productService;
         this.warehouseService = warehouseService;
@@ -36,24 +48,20 @@ public class CalculateService {
     }
 
     public List<ProductWithCategory> ABCXYZ(double a, double b, double c, double x, double y, double z) {
-
         List<Product> products = productService.getAll();
         List<Warehouse> warehouses = warehouseService.getAll();
-
         Map<Long, Long> productToQty = new HashMap<>(products.size());
         long grandTotal = 0L;
 
         for (Product product : products) {
             long sumForProduct = 0L;
             Long productId = product.getId();
-
             for (Warehouse wh : warehouses) {
                 Long warehouseId = wh.getId();
                 Long quantity = shipmentsProductsService.getTotalQuantitySentFromWarehouse(warehouseId, productId);
                 BigDecimal totalMoney = product.getPrice().multiply(BigDecimal.valueOf(quantity));
                 sumForProduct += totalMoney.longValue();
             }
-
             productToQty.put(productId, sumForProduct);
             grandTotal += sumForProduct;
         }
@@ -69,6 +77,7 @@ public class CalculateService {
             double fraction = (double)cumulative / grandTotal;
 
             String category;
+
             if (fraction <= a) {
                 category = "A";
             } else if (fraction <= a+b) {
@@ -94,7 +103,7 @@ public class CalculateService {
     }
 
     private double getCoef(Long productId) {
-        HashSet<Long> warehousesId = getEndWarehouses(); /// change to only end warehouse
+        HashSet<Long> warehousesId = getEndWarehouses();
         double sum = 0L;
         for (Long whId : warehousesId) {
             HistoricalData d = shipmentsProductsService.getDemand( settingsService.getStart(), settingsService.getEnd(),  warehouseService.findById(whId), productService.getById(productId));
@@ -102,6 +111,7 @@ public class CalculateService {
         }
         return sum/warehousesId.size();
     }
+
     private void getChild(HashSet<Long> warehouses, Long parentId) {
         List<Long> childIds = supplyChainEdgeService.findChildWarehouseIdsByWarehouseId(parentId);
         if (childIds.isEmpty()) {warehouses.add(parentId);}
@@ -112,6 +122,7 @@ public class CalculateService {
         }
 
     }
+
     private HashSet<Long> getEndWarehouses() {
         List<Supplier> suppliers = supplierRepository.findAll();
         HashSet<Long> warehouses = new HashSet<>();
@@ -124,7 +135,6 @@ public class CalculateService {
         }
         return warehouses;
     }
-
 
     public  double calculateMean(List<Integer> data) {
         double sum = 0;
@@ -143,122 +153,11 @@ public class CalculateService {
         return Math.sqrt(sumSquaredDiffs / data.size());
     }
 
-    public ProductOpt calculateSingle(int s, int R, Long productId, Long warehouseId) {
-        Product product = productService.getById(productId);
-        Warehouse warehouse = warehouseService.findById(warehouseId);
-        ProductOpt productOpt = new ProductOpt();
-
-        List<Long> childrenId = supplyChainEdgeService.findChildWarehouseIdsByWarehouseId(warehouseId);
-
-        double d_mean = 0L;
-        double d_stdDev = 0L;
-        NormalDistribution normal = new NormalDistribution();
-        double z = normal.inverseCumulativeProbability((double) s /100);
-        SupplyChainEdge edge = new SupplyChainEdge();
-        Optional<SupplyChainEdge> edge1 = supplyChainEdgeService.findEdgeByToWarehouseId(warehouseId);
-        if (edge1.isPresent()) {edge = edge1.get();}
-        int L = edge.getLength();
-        int t = edge.getLength();
-        double l_mean = t;
-        double l_stdDev = 0;
-        int D = 0;
-        int Q = 0;
-        int S = 0;
-        int SS = 0;
-        int I = warehousesProductsService.findQuantityByWarehouseIdAndProductIdAndStockDate(warehouseId, productId, settingsService.getEnd());
-        List<Integer> deliveryTimes = new ArrayList<>();
-        if (edge.getFromNodeId().getWarehouse() != null) {
-            deliveryTimes = deliveryService.getTimeDiff(edge.getFromNodeId().getWarehouse().getId(), null, warehouseId);
-        } else if (edge.getToNodeId().getSupplier() != null) {
-            deliveryTimes = deliveryService.getTimeDiff(null, edge.getToNodeId().getSupplier().getId(), warehouseId);
-        }
-        else deliveryTimes.add(1);
-
-        for (int i = 0; i < deliveryTimes.size(); i++) {
-            deliveryTimes.set(i, deliveryTimes.get(i) + t);
-        }
-
-        l_mean = calculateMean(deliveryTimes);
-        l_stdDev = calculateStandardDeviation(deliveryTimes);
-        int risk_period = t;
-        List<Integer> dd = new ArrayList<>();
-        for(int i = 0; i < risk_period; i++) {
-            dd.add(0);
-        }
-        if (!childrenId.isEmpty()) {
-            List<Integer> allDDR = new ArrayList<>(); //make more optimal
-            for (int i = 0; i < R; i++) {
-                allDDR.add(0);
-            }
-            for (Long childId : childrenId) {
-                ProductOpt childOpt = calculateSingle(s, R,  productId, childId);
-                d_mean += childOpt.getMean();
-                d_stdDev += childOpt.getDev(); //change
-                S += childOpt.getOptimalStock();
-                I += childOpt.getI();
-                I -= childOpt.getOptimalOrder();
-                if(I < 0) I = 0;
-                List<Integer> childD = childOpt.getD();
-                int size = childD.size();
-                childD = childD.subList(size- R, size);
-                for(int i = 0; i < childD.size(); i++) {
-                    allDDR.set(i, allDDR.get(i)+childD.get(i));
-                }
-
-                size = childD.size();
-                int startIndex = Math.max(0, size - (risk_period));
-                childD = childD.subList(startIndex, size);
-                for (int i = 0; i < risk_period; i++) {
-                    dd.set(i, dd.get(i)+childD.get(i));
-                }
-
-            }
-
-            for (int d : dd) {
-                D += d;
-            }
-
-            SS = (int) Math.ceil(z * Math.sqrt((l_mean) * d_stdDev * d_stdDev + d_mean * d_mean * l_stdDev * l_stdDev));
-
-            dd = allDDR;
-        }
-        else {
-            risk_period = t+R;
-
-            HistoricalData hd = shipmentsProductsService.getDemand(settingsService.getStart(), settingsService.getEnd(), warehouse, product);
-            d_mean = calculateMean(hd.getQuantities());
-            d_stdDev = calculateStandardDeviation(hd.getQuantities());
-            dd = forecastService.getBestModelResult(productId, warehouseId, risk_period).getQuantities();
-            int size = dd.size();
-            int startIndex = Math.max(0, size - (risk_period));
-            dd = dd.subList(startIndex, size);
-            for (int d : dd) {
-                D += d;
-            }
-            SS = (int) Math.ceil(z * Math.sqrt((l_mean + R) * d_stdDev * d_stdDev + d_mean * d_mean * l_stdDev * l_stdDev));
-
-        }
-
-        S += D + SS;
-        Q = S - I;
-        if (Q < 0) Q = 0;
-
-        productOpt = new ProductOpt(productId, product.getSku(), product.getName(), D, SS, S, Q);
-        productOpt.setDev(d_stdDev);
-        productOpt.setMean(d_mean);
-        productOpt.setI(I);
-        productOpt.setD(dd);
-
-        return productOpt;
-
-    }
-
-
     private void addChildren(Long parentId, List<Long> childrenId, Map<Long, Node> map, List<Long> endWarehouses) {
         if(childrenId.isEmpty()) {endWarehouses.add(parentId); return;}
         for(Long childId : childrenId) {
             Node childNode = new Node(childId);
-        //    childNode.h = longValue(warehouseService.findById(childId).getCost());
+            childNode.h = longValue(warehouseService.findById(childId).getHoldingCost());
             childNode.t = supplyChainEdgeService.findEdgeLengthByWarehouseIdAndWarehouseId(parentId, childId);
             childNode.M = childNode.t + map.get(parentId).M; //change
             List<Long> childrenIds = supplyChainEdgeService.findChildWarehouseIdsByWarehouseId(childId);
@@ -270,16 +169,15 @@ public class CalculateService {
         }
     }
 
-    public int getOptimalOrder(Long productId) {
-
-        double z = 1.64;
+    public Map<Long, List<Integer>> getOptimalCST(Long productId, double z_p) {
+        NormalDistribution normal = new NormalDistribution();
+        double z = normal.inverseCumulativeProbability(z_p);
 
         //загрузка цепи
-        Long mainSuppplierId = suppliersProductsService.findSuppliersByProductId(productId).get(0).getId(); //поставщик он всегда один
-
-        BigDecimal cost = suppliersProductsService.findPriceBySupplierAndProduct(mainSuppplierId, productId); //не нужен потом в конце
-
-        List<Long> endWarehouses = new ArrayList<>(); //идишники складов с которых надо найти среднее отклонение
+        Long mainSuppplierId = suppliersProductsService.findSuppliersByProductId(productId).get(0).getId(); //поставщик
+        BigDecimal cost = suppliersProductsService.findPriceBySupplierAndProduct(mainSuppplierId, productId);
+        System.out.println(productId + ": " + cost + " " + mainSuppplierId);
+        List<Long> endWarehouses = new ArrayList<>(); //ид складов с которых надо найти среднее отклонение
 
         List<Long> startNodesId = supplyChainEdgeService.findChildWarehouseIdsBySupplierId(mainSuppplierId);
         Map<Long, Node> map = new HashMap<>();
@@ -287,33 +185,34 @@ public class CalculateService {
         for(Long startNodeId : startNodesId) {
             Node startNode = new Node(startNodeId);
             startNode.cost = longValue(cost);
-          //  startNode.h = longValue(warehouseService.findById(startNodeId).getCost());
+            startNode.h = longValue(warehouseService.findById(startNodeId).getHoldingCost());
             startNode.t = supplyChainEdgeService.findEdgeLengthBySupplierIdAndWarehouseId(mainSuppplierId, startNodeId);
             startNode.M = startNode.t;
             List<Long> childrenId = supplyChainEdgeService.findChildWarehouseIdsByWarehouseId(startNodeId);
             startNode.children.addAll(childrenId);
             map.put(startNodeId, startNode);
             addChildren(startNodeId, childrenId, map, endWarehouses);
-
             for(Long endNodeId : endWarehouses) {
                 double dev = longValue(shipmentsProductsService.getDev(endNodeId));
                 map.get(endNodeId).stdDev = longValue(dev);
                 addDev(endNodeId, dev, map);
             }
-
-
+        }
+        for(Node node : map.values()) {
+            if(!endWarehouses.contains(node.nodeId)){
+                node.stdDev = Math.sqrt(node.stdDev);
+            }
         }
 
-
         //тест
-        map = Map.of(
-                1L, new Node(List.of(2L,3L),new ArrayList<>(), 20,1,20,20,3,3,58,1L),
-                2L, new Node(List.of(4L),List.of(1L), 20,2,20,20,2,5,30,2L),
-                3L, new Node(List.of(5L,6L),List.of(1L), 20,5,20,20,3,6,54,3L),
-                4L, new Node(new ArrayList<>(),List.of(2L), 20,1,20,20,4,9,30,4L),
-                5L, new Node(new ArrayList<>(),List.of(3L), 20,3,20,20,1,7,20,5L),
-                6L, new Node(new ArrayList<>(),List.of(3L), 20,3,20,20,5,11,50,6L)
-        );
+//        map = Map.of(
+//                35L, new Node(List.of(36L,37L),new ArrayList<>(), 20,1,20,20,3,3,58,35L),
+//                36L, new Node(List.of(38L),List.of(35L), 20,2,20,20,2,5,30,36L),
+//                37L, new Node(List.of(39L,40L),List.of(35L), 20,5,20,20,3,6,54,37L),
+//                38L, new Node(new ArrayList<>(),List.of(36L), 20,1,20,20,4,9,30,38L),
+//                39L, new Node(new ArrayList<>(),List.of(37L), 20,3,20,20,1,7,20,39L),
+//                40L, new Node(new ArrayList<>(),List.of(37L), 20,3,20,20,5,11,50,40L)
+//        );
 
         int numOfNodes = map.size();
 
@@ -515,17 +414,24 @@ public class CalculateService {
                 }
             }
         }
-        return 0;
+
+        System.out.println(Arrays.toString(GL));
+        System.out.println(Arrays.toString(GST));
+        System.out.println(nonMarked);
+        Map<Long, List<Integer>> res = new HashMap<>();
+        for(int i = 0; i < GST.length; i++) {
+            res.put(nonMarked.get(i),List.of(GL[i]+ map.get(nonMarked.get(i)).t - GST[i]));
+            System.out.println(GL[i]+ map.get(nonMarked.get(i)).t - GST[i]);
+        }
+        return res;
     }
-
-
 
     private void addDev(Long endNodeId, double dev, Map<Long, Node> map) {
         Node endNode = map.get(endNodeId);
         List<Long> parents = endNode.parents;
         for(Long parentId : parents) {
             Node parent = map.get(parentId);
-            parent.stdDev += dev;
+            parent.stdDev += dev*dev;
             addDev(parentId, dev, map);
         }
     }
@@ -547,19 +453,180 @@ public class CalculateService {
         return data;
     }
 
-    public Map<Long, List<ProductOpt>> getProductbyWarehouse(int s, int r) {
+    public Map<Long, List<ProductOpt>> calculateOrder(int s, int r) {
         Map<Long, List<ProductOpt>> productsByWarehouse = new HashMap<>();
         List<Warehouse> warehouses = warehouseService.getAll();
         List<ProductWithCategory> products = ABCXYZ(0.8,0.15,0.05,0.15,0.25,0.6);
-        for (Warehouse warehouse : warehouses) {
-            List<ProductOpt> productOpts = new ArrayList<>();
-            productsByWarehouse.put(warehouse.getId(), productOpts);
-            for(ProductWithCategory product : products) {
-                ProductOpt p = calculateSingle(s,r, product.getId(), warehouse.getId());
-                p.setCategory(product.getCategory());
-                productOpts.add(p);
+        for (ProductWithCategory product : products) {
+            Map<Long, List<ProductOpt>> productOpts = calculateOneProduct(s, r, product.getId());
+            for (Map.Entry<Long, List<ProductOpt>> entry : productOpts.entrySet()) {
+                Long warehouseId = entry.getKey();
+                List<ProductOpt> newOpts = entry.getValue();
+                for (ProductOpt opt : newOpts) {
+                    opt.setCategory(product.getCategory());
+                }
+                productsByWarehouse.merge(warehouseId, newOpts, (existingOpts, newList) -> {
+                    List<ProductOpt> mutableList = new ArrayList<>(existingOpts);
+                    mutableList.addAll(newList);
+                    return mutableList;
+                });
             }
         }
         return productsByWarehouse;
+    }
+
+    public Map<Long, List<ProductOpt>> calculateOneProduct(int s, int R, Long productId) {
+        Map<Long, List<Integer>> opt_phi_lamda = getOptimalCST(productId, (double) s /100);
+        Map<Long, List<ProductOpt>> res = new HashMap<>();
+        for( Long key : opt_phi_lamda.keySet()) {
+            ProductOpt productOpt = getOrderSize(s, R, productId,key, opt_phi_lamda);
+            res.put(key, List.of(productOpt));
+        }
+
+        return res;
+    }
+
+    public ProductOpt getOrderSize(int s, int R, Long productId, Long warehouseId, Map<Long, List<Integer>> risk_period_opt) {
+        Product product = productService.getById(productId);
+        Warehouse warehouse = warehouseService.findById(warehouseId);
+        ProductOpt productOpt = new ProductOpt();
+        List<Long> childrenId = supplyChainEdgeService.findChildWarehouseIdsByWarehouseId(warehouseId);
+
+        double d_mean = 0L;
+        double d_stdDev = 0L;
+        NormalDistribution normal = new NormalDistribution();
+        double z = normal.inverseCumulativeProbability((double) s /100);
+        SupplyChainEdge edge = new SupplyChainEdge();
+        Optional<SupplyChainEdge> edge1 = supplyChainEdgeService.findEdgeByToWarehouseId(warehouseId);
+        if (edge1.isPresent()) {edge = edge1.get();}
+        int t = edge.getLength();
+        int D = 0;
+        int Q = 0;
+        int S = 0;
+        int SS = 0;
+        int I = warehousesProductsService.findQuantityByWarehouseIdAndProductIdAndStockDate(warehouseId, productId, settingsService.getEnd());
+        List<Integer> deliveryTimes = new ArrayList<>();
+        if (edge.getFromNodeId().getWarehouse() != null) {
+            deliveryTimes = deliveryService.getTimeDiff(edge.getFromNodeId().getWarehouse().getId(), null, warehouseId);
+        } else if (edge.getToNodeId().getSupplier() != null) {
+            deliveryTimes = deliveryService.getTimeDiff(null, edge.getToNodeId().getSupplier().getId(), warehouseId);
+        }
+        else deliveryTimes.add(1);
+
+        for (int i = 0; i < deliveryTimes.size(); i++) {
+            deliveryTimes.set(i, deliveryTimes.get(i) + t);
+        }
+
+        int risk_period = risk_period_opt.get(warehouseId).get(0);
+        List<Integer> dd = new ArrayList<>();
+        for(int i = 0; i < risk_period; i++) {
+            dd.add(0);
+        }
+        if (!childrenId.isEmpty()) {
+            List<Integer> allDDR = new ArrayList<>();
+            for (int i = 0; i < R; i++) {
+                allDDR.add(0);
+            }
+            for (Long childId : childrenId) {
+                ProductOpt childOpt = getOrderSize(s, R,  productId, childId, risk_period_opt);
+                d_mean += childOpt.getMean();
+                d_stdDev += childOpt.getDev();
+                S += childOpt.getOptimalStock();
+                I += childOpt.getI();
+                I -= childOpt.getOptimalOrder();
+                if(I < 0) I = 0;
+                List<Integer> childD = childOpt.getD();
+                int size = childD.size();
+                childD = childD.subList(size - R, size);
+                for(int i = 0; i < childD.size(); i++) {
+                    allDDR.set(i, allDDR.get(i)+childD.get(i));
+                }
+
+                size = childD.size();
+                int startIndex = Math.max(0, size - (risk_period));
+                childD = childD.subList(startIndex, size);
+                for (int i = 0; i < risk_period; i++) {
+                    dd.set(i, dd.get(i)+childD.get(i));
+                }
+
+            }
+
+            for (int d : dd) {
+                D += d;
+            }
+
+            SS = (int) Math.ceil(z * d_stdDev * Math.sqrt(risk_period));
+
+            dd = allDDR;
+        }
+        else {
+            risk_period =  risk_period_opt.get(warehouseId).get(0)+R;
+            HistoricalData hd = shipmentsProductsService.getDemand(settingsService.getStart(), settingsService.getEnd(), warehouse, product);
+            d_mean = calculateMean(hd.getQuantities());
+            d_stdDev = calculateStandardDeviation(hd.getQuantities());
+            dd = forecastService.getBestModelResult(productId, warehouseId, risk_period).getQuantities();
+            int size = dd.size();
+            int startIndex = Math.max(0, size - (risk_period));
+            dd = dd.subList(startIndex, size);
+            for (int d : dd) {
+                D += d;
+            }
+            SS = (int) Math.ceil(z * d_stdDev * Math.sqrt(risk_period));
+
+        }
+
+        S += D + SS;
+        Q = S - I;
+        if (Q < 0) Q = 0;
+
+        productOpt = new ProductOpt(productId, product.getSku(), product.getName(), D, SS, S, Q);
+        productOpt.setDev(d_stdDev);
+        productOpt.setMean(d_mean);
+        productOpt.setI(I);
+        productOpt.setD(dd);
+
+        return productOpt;
+
+    }
+
+    public ResponseEntity<byte[]> resultToExcel(ExportRequest request) throws IOException {
+        String warehouseName = warehouseService.findById(request.getWarehouseId()).getName();
+        List<OrderData> orders = request.getOrders();
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Поставка");
+
+        Row header = sheet.createRow(0);
+        header.createCell(0).setCellValue("Код товара");
+        header.createCell(1).setCellValue("Название товара");
+        header.createCell(2).setCellValue("Количество");
+
+        for (int i = 0; i < orders.size(); i++) {
+            OrderData order = orders.get(i);
+            Row row = sheet.createRow(i + 1);
+            row.createCell(0).setCellValue(productService.getById(Long.valueOf(order.getProductId())).getSku());
+            row.createCell(1).setCellValue(productService.getById(Long.valueOf(order.getProductId())).getName());
+            row.createCell(2).setCellValue(order.getFinalOrderSize());
+        }
+
+        for (int i = 0; i < 3; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        workbook.write(outputStream);
+        workbook.close();
+
+        String fileName = "Поставка_" + warehouseName + ".xlsx";
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", encodedFileName);
+        headers.setContentLength(outputStream.size());
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(outputStream.toByteArray());
     }
 }

@@ -30,8 +30,6 @@ public class ForecastService {
     @Autowired
     private SettingsService settingsService;
 
-
-
     public HistoricalData getBestModelResult(Long productId, Long warehouseId, Integer days) {
         HistoricalData hd = this.getHistoricalDemand(productId, warehouseId, settingsService.getStart(), settingsService.getEnd());
         List<Integer> d = hd.getQuantities();
@@ -44,46 +42,49 @@ public class ForecastService {
         List<Integer> test = new ArrayList<>(d.subList(train_n, size));
 
         predict = calcMA(d, 1, test_n);
-        double bestError = calculateMAE(predict,test);
+        double bestError = calculateMAE(predict, test);
         int choose = 0;
         double bestAlpha = 0.0;
         double bestBeta = 0.0;
         double besty = 0.0;
         double bestphi = 0.0;
 
+        for (double aa = 0.05; aa <= 0.5; aa += 0.05) {
+            predict = calcSES(train, aa, test_n);
+            predict = predict.subList(train_n, size);
+            double error = calculateMAE(predict, test);
+            if (error < bestError) {
+                bestError = error;
+                bestAlpha = aa;
+                choose = 1;
+            }
+        }
 
-                for (double aa = 0.05; aa < 0.5; aa+=0.01) {
-                    predict = calcSES(train, aa, test_n);
+        for (double aa = 0.05; aa <= 0.5; aa += 0.05) {
+            for (double bb = 0.05; bb <= 0.5; bb += 0.05) {
+                for (double pphi = 0.05; pphi <= 1.0; pphi += 0.05) {
+                    predict = calcDES(train, test_n, aa, bb,pphi);
                     predict = predict.subList(train_n, size);
-                    double error = calculateMAE(predict,test);
+                    double error = calculateMAE(predict, test);
                     if (error < bestError) {
                         bestError = error;
                         bestAlpha = aa;
-                        choose = 1;
+                        bestBeta = bb;
+                        bestphi = pphi;
+                        choose = 2;
                     }
                 }
 
-//        for (double aa = 0.05; aa < 0.5; aa+=0.01) {
-//            for (double bb = 0.05; bb < 0.5; bb+=0.01) {
-//                predict = calcDES(train, test_n, aa, bb);
-//                predict = predict.subList(train_n, size);
-//                double error = calculateMAE(predict,test);
-//                if (error < bestError) {
-//                    bestError = error;
-//                    bestAlpha = aa;
-//                    bestBeta = bb;
-//                    choose =2;
-//                }
-//            }
-//        }
+            }
+        }
 
-        for (double aa = 0.05; aa < 0.5; aa+=0.01) {
-            for (double bb = 0.05; bb < 0.5; bb+=0.01) {
-                for (double yy = 0.05;yy < 0.5;yy+=0.01) {
-                    //for (double pphi = 0.05;pphi < 0.5;pphi+=0.01) {
-                        predict = calcTES(train, test_n, aa, bb, yy,0.3);
+        for (double aa = 0.05; aa <= 0.5; aa += 0.05) {
+            for (double bb = 0.05; bb <= 0.5; bb += 0.05) {
+                for (double yy = 0.05; yy <= 0.3; yy += 0.05) {
+                    for (double pphi = 0.05; pphi < 1.0; pphi += 0.05) {
+                        predict = calcTES(train, test_n, aa, bb, yy, pphi);
                         predict = predict.subList(train_n, size);
-                        double error = calculateMAE(predict,test);
+                        double error = calculateMAE(predict, test);
                         if (error < bestError) {
                             bestError = error;
                             bestAlpha = aa;
@@ -91,33 +92,35 @@ public class ForecastService {
                             besty = yy;
                             bestphi = 0.3;
                             choose = 3;
-                     //   }
-
+                        }
                     }
-
+                    }
                 }
             }
+
+            System.out.println("bestAlpha = " + bestAlpha + ", bestBeta = " + bestBeta + ", besty = " + besty + ", choose = " + choose + " error = " + bestError);
+
+            List<LocalDate> dates = new ArrayList<>(hd.getDates());
+            for (int i = 0; i < days; i++) {
+                dates.add(dates.getLast().plusDays(1));
+            }
+
+            if (choose == 0) {
+                predict = MA(productId, warehouseId, days, d.size() - 1).getQuantities();
+            } else if (choose == 1) {
+                predict = SES(productId, warehouseId, days, bestAlpha).getQuantities();
+            } else if (choose == 2) {
+                predict = DES(productId, warehouseId, days, bestAlpha, bestBeta).getQuantities();
+            } else if (choose == 3) {
+                predict = TES(productId, warehouseId, days, bestAlpha, bestBeta, besty).getQuantities();
+            } else predict = TES(productId, warehouseId, days, bestAlpha, bestBeta, besty).getQuantities();
+
+            HistoricalData result = new HistoricalData();
+            result.setDates(dates);
+            result.setQuantities(predict);
+            return result;
+
         }
-
-        //System.out.println("bestAlpha = " + bestAlpha + ", bestBeta = " + bestBeta + ", besty = " + besty + ", choose = " + choose + " error = " + bestError);
-
-        List<LocalDate> dates = new ArrayList<>(hd.getDates());
-        for (int i = 0; i < days; i++) {
-            dates.add(dates.getLast().plusDays(1));
-        }
-
-        if (choose == 0) {predict = MA(productId,warehouseId,days,d.size()-1).getQuantities();}
-        else if(choose == 1) {predict = SES(productId,warehouseId,days,bestAlpha).getQuantities();}
-        else if(choose == 2) {predict = DES(productId,warehouseId,days,bestAlpha,bestBeta).getQuantities();}
-        else if(choose == 3) {predict = TES(productId,warehouseId,days,bestAlpha,bestBeta,besty).getQuantities();}
-        else predict = TES(productId,warehouseId, days, bestAlpha, bestBeta, besty).getQuantities();
-
-        HistoricalData result = new HistoricalData();
-        result.setDates(dates);
-        result.setQuantities(predict);
-        return result;
-
-    }
 
     public HistoricalData getHistoricalDemand(Long productId, Long warehouseId, LocalDate startDate, LocalDate endDate) {
         List<ShipmentsProducts> shipments = shipmentsProductsRepository
@@ -280,7 +283,7 @@ public class ForecastService {
         List<Integer> d = hd.getQuantities();
         int size = d.size();
         List<Integer> predict = new ArrayList<>();
-
+    double phi = 0.0;
         if (alpha == null && beta == null) {
             int train_n = (int) (size * 0.7);
             int test_n = size - train_n;
@@ -290,22 +293,27 @@ public class ForecastService {
             double bestAlpha = 0.5;
             double bestBeta = 0.5;
             double bestError = Double.MAX_VALUE;
+            double bestphi = 0.0;
 
-            for (double aa = 0.05; aa < 0.5; aa+=0.01) {
-                for (double bb = 0.05; bb < 0.5; bb+=0.01) {
-                    predict = calcDES(train, test_n, aa, bb);
-                    predict = predict.subList(train_n, size);
-                    double error = calculateMAE(predict,test);
-                    if (error < bestError) {
-                        bestError = error;
-                        bestAlpha = aa;
-                        bestBeta = bb;
+            for (double aa = 0.05; aa <= 0.5; aa+=0.01) {
+                for (double bb = 0.05; bb <= 0.5; bb+=0.01) {
+                    for(double pphi = 0.05; pphi <= 1.0; pphi+=0.01) {
+                        predict = calcDES(train, test_n, aa, bb, pphi);
+                        predict = predict.subList(train_n, size);
+                        double error = calculateMAE(predict,test);
+                        if (error < bestError) {
+                            bestError = error;
+                            bestAlpha = aa;
+                            bestBeta = bb;
+                            bestphi = pphi;
+                        }
                     }
+
                 }
             }
 
-            //System.out.println("Best alpha: " + bestAlpha + " nbeta " + bestBeta + ", Best MAE on train: " + bestError);
-
+            System.out.println("Best alpha: " + bestAlpha + " nbeta " + bestBeta + "besetphi " + bestphi + ", Best MAE on train: " + bestError);
+            phi = bestphi;
             alpha = bestAlpha;
             beta = bestBeta;
         }
@@ -315,7 +323,7 @@ public class ForecastService {
             dates.add(dates.getLast().plusDays(1));
         }
 
-        predict = calcDES(d,days,alpha,beta);
+        predict = calcDES(d,days,alpha,beta,phi);
 
         for (int i = 0; i < predict.size() - days; i++) {
             predict.set(i, null);
@@ -327,7 +335,7 @@ public class ForecastService {
         return result;
     }
 
-    private List<Integer> calcDES(List<Integer> d, int days, Double alpha, Double beta) {
+    private List<Integer> calcDES(List<Integer> d, int days, Double alpha, Double beta, Double phi) {
         List<Integer> predict = new ArrayList<>();
         List<Double> A = new ArrayList<>();
         List<Double> B = new ArrayList<>();
@@ -337,16 +345,16 @@ public class ForecastService {
 
         for (int i = 1; i < d.size() + days; i++) {
             if(i >= d.size()){
-                int x = (int) (A.get(i-1) + B.get(i-1));
+                int x = (int) (A.get(i-1) + phi*B.get(i-1));
                 predict.add(x);
                 A.add(Double.valueOf(predict.get(i)));
-                B.add(B.get(i-1));
+                B.add(phi*B.get(i-1));
             }
             else {
-                int x = (int) (A.get(i-1) + B.get(i-1));
+                int x = (int) (A.get(i-1) + phi*B.get(i-1));
                 predict.add(x);
-                A.add(alpha*d.get(i) + (1-alpha)*(A.get(i-1) + B.get(i-1)));
-                B.add(beta*(A.get(i)-A.get(i-1)) + (1-beta)*B.get(i-1));
+                A.add(alpha*d.get(i) + (1-alpha)*(A.get(i-1) + phi*B.get(i-1)));
+                B.add(beta*(A.get(i)-A.get(i-1)) + (1-beta)*phi*B.get(i-1));
             }
         }
         return predict;
@@ -370,21 +378,21 @@ public class ForecastService {
             double bestphi = 0.5;
             double bestError = Double.MAX_VALUE;
 
-            for (double aa = 0.05; aa < 0.5; aa+=0.01) {
-                for (double bb = 0.05; bb < 0.5; bb+=0.01) {
-                    for (double yy = 0.05;yy < 0.5;yy+=0.01) {
-                        for (double pphi = 0.05;pphi < 0.9 ;pphi+=0.01) {
+            for (double aa = 0.05; aa < 0.5; aa+=0.05) {
+                for (double bb = 0.05; bb < 0.5; bb+=0.05) {
+                    for (double yy = 0.05;yy < 0.3;yy+=0.05) {
+                        for (double pphi = 0;pphi <= 1.0 ;pphi+=0.05) {
 
                             predict = calcTES(train, test_n, aa, bb, yy,pphi);
                             predict = predict.subList(train_n, size);
                             double error = calculateMAE(predict,test);
-                            if (error < bestError) {
+
+                            if (error <= bestError) {
                                 bestError = error;
                                 bestAlpha = aa;
                                 bestBeta = bb;
                                 besty = yy;
                                 bestphi = pphi;
-
                         }
 
                         }
@@ -392,8 +400,9 @@ public class ForecastService {
                 }
             }
 
-            //System.out.println("Best alpha: " + bestAlpha + " nbeta " + bestBeta + " y " + besty +  ", Best MAE on train: " + bestError);
-
+//            System.out.println("Best alpha: " + bestAlpha + " nbeta " + bestBeta + " y " + besty + " phi " + bestphi + ", Best MAE on train: " + bestError);
+//            System.out.println(predict);
+//            System.out.println(test);
             alpha = bestAlpha;
             beta = bestBeta;
             phi = bestphi;

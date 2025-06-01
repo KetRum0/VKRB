@@ -1,10 +1,7 @@
 package com.maidiploma.supplychainapp.controllers;
 
 import com.maidiploma.supplychainapp.model.*;
-import com.maidiploma.supplychainapp.service.ForecastService;
-import com.maidiploma.supplychainapp.service.ProductService;
-import com.maidiploma.supplychainapp.service.SettingsService;
-import com.maidiploma.supplychainapp.service.WarehouseService;
+import com.maidiploma.supplychainapp.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,14 +15,22 @@ import java.util.Map;
 @Controller
 public class ForecastController {
 
-    @Autowired
-    private ProductService productService;
-    @Autowired
-    private ForecastService forecastService;
-    @Autowired
-    private SettingsService settingsService;
-    @Autowired
-    private WarehouseService warehouseService;
+    private final ProductService productService;
+    private final ForecastService forecastService;
+    private final SettingsService settingsService;
+    private final WarehouseService warehouseService;
+
+    public ForecastController(
+            ProductService productService,
+            ForecastService forecastService,
+            SettingsService settingsService,
+            WarehouseService warehouseService
+    ) {
+        this.productService = productService;
+        this.forecastService = forecastService;
+        this.settingsService = settingsService;
+        this.warehouseService = warehouseService;
+    }
 
     @GetMapping("/forecast")
     public String getForecastPage(Model model) {

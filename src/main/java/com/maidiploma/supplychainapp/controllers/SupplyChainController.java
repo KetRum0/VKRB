@@ -8,6 +8,9 @@ import com.maidiploma.supplychainapp.repository.SupplierRepository;
 import com.maidiploma.supplychainapp.repository.SupplyChainEdgeRepository;
 import com.maidiploma.supplychainapp.repository.SupplyChainNodeRepository;
 import com.maidiploma.supplychainapp.repository.WarehouseRepository;
+import com.maidiploma.supplychainapp.service.ProductService;
+import com.maidiploma.supplychainapp.service.SupplierService;
+import com.maidiploma.supplychainapp.service.SuppliersProductsService;
 import org.apache.commons.math3.geometry.spherical.twod.Edge;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -22,15 +25,17 @@ import java.util.Optional;
 @Controller
 public class SupplyChainController {
 
-    @Autowired
-    private SupplyChainNodeRepository supplyChainNodeRepository;
-    @Autowired
-    private SupplyChainEdgeRepository supplyChainEdgeRepository;
-    @Autowired
-    private WarehouseRepository warehouseRepository;
-    @Autowired
-    private SupplierRepository supplierRepository;
+    private final SupplyChainNodeRepository supplyChainNodeRepository;
+    private final SupplyChainEdgeRepository supplyChainEdgeRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final SupplierRepository supplierRepository;
 
+    public SupplyChainController(SupplyChainNodeRepository supplyChainNodeRepository, SupplyChainEdgeRepository supplyChainEdgeRepository, WarehouseRepository warehouseRepository, SupplierRepository supplierRepository) {
+        this.supplyChainNodeRepository = supplyChainNodeRepository;
+        this.supplyChainEdgeRepository = supplyChainEdgeRepository;
+        this.warehouseRepository = warehouseRepository;
+        this.supplierRepository = supplierRepository;
+    }
 
     @GetMapping("/supplychain")
     public String getSupplyChain(Model model) {
@@ -75,11 +80,8 @@ public class SupplyChainController {
                           @RequestParam Long toId,
                           @RequestParam int length) {
 
-        SupplyChainNode fromNode = supplyChainNodeRepository.findById(fromId)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid fromId: " + fromId));
-        SupplyChainNode toNode = supplyChainNodeRepository.findById(toId)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid toId: " + toId));
-
+        SupplyChainNode fromNode = supplyChainNodeRepository.findById(fromId).orElseThrow(() -> new IllegalArgumentException("Invalid fromId: " + fromId));
+        SupplyChainNode toNode = supplyChainNodeRepository.findById(toId).orElseThrow(() -> new IllegalArgumentException("Invalid toId: " + toId));
         SupplyChainEdge edge = new SupplyChainEdge(null, fromNode, toNode, length);
         supplyChainEdgeRepository.save(edge);
 

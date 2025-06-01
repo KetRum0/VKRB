@@ -106,21 +106,15 @@ public class SuppliersController {
     public String editProductPrice(
             @PathVariable Long id,
             @RequestParam("productId") Long productId,
-            @RequestParam("price") BigDecimal newPrice,
-            RedirectAttributes redirectAttributes
+            @RequestParam("price") BigDecimal newPrice
     ) {
-        try {
-            SupplierProductId key = new SupplierProductId();
-            key.setProduct(productService.getById(productId));
-            key.setSupplier(supplierService.getById(id));// если ключ составной
-            SuppliersProducts supplierProduct = suppliersProductsService.findById(key);
+        SupplierProductId key = new SupplierProductId();
+        key.setProduct(productService.getById(productId));
+        key.setSupplier(supplierService.getById(id));
+        SuppliersProducts supplierProduct = suppliersProductsService.findById(key);
 
-            supplierProduct.setPrice(newPrice);
-            suppliersProductsService.save(supplierProduct);
-
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "Ошибка при обновлении цены: " + e.getMessage());
-        }
+        supplierProduct.setPrice(newPrice);
+        suppliersProductsService.save(supplierProduct);
 
         return "redirect:/suppliers/view/" + id;
     }

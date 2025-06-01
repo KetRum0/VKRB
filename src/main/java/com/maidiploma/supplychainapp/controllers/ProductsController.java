@@ -3,8 +3,7 @@ package com.maidiploma.supplychainapp.controllers;
 import com.maidiploma.supplychainapp.model.Product;
 import com.maidiploma.supplychainapp.model.Warehouse;
 import com.maidiploma.supplychainapp.repository.*;
-import com.maidiploma.supplychainapp.service.ProductService;
-import com.maidiploma.supplychainapp.service.SettingsService;
+import com.maidiploma.supplychainapp.service.*;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -22,16 +21,26 @@ import java.util.stream.Collectors;
 @RequestMapping("/products")
 public class ProductsController {
 
-    @Autowired
-    private WarehousesProductsRepository warehousesProductsRepository;
-    @Autowired
-    private WarehouseRepository warehouseRepository;
-    @Autowired
-    private ProductService productService;
-    @Autowired
-    private ShipmentsProductsRepository shipmentsProductsRepository;
-    @Autowired
-    private SettingsService settingsService;
+    private final WarehousesProductsRepository warehousesProductsRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final ProductService productService;
+    private final ShipmentsProductsRepository shipmentsProductsRepository;
+    private final SettingsService settingsService;
+
+    public ProductsController(
+            WarehousesProductsRepository warehousesProductsRepository,
+            WarehouseRepository warehouseRepository,
+            ProductService productService,
+            ShipmentsProductsRepository shipmentsProductsRepository,
+            SettingsService settingsService
+    ) {
+        this.warehousesProductsRepository = warehousesProductsRepository;
+        this.warehouseRepository = warehouseRepository;
+        this.productService = productService;
+        this.shipmentsProductsRepository = shipmentsProductsRepository;
+        this.settingsService = settingsService;
+    }
+
 
     @GetMapping
     public String listProducts(Model model) {
